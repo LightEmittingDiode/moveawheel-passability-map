@@ -1,6 +1,7 @@
 const CENTER={lat:36.365473,lng:127.338021};
 const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
-export async function handleRequest(request,env,assets){
+export async function handleRequest(request,env,assets){const origin=request.headers.get('Origin'),allowed=origin==='https://lightemittingdiode.github.io';if(request.method==='OPTIONS'&&new URL(request.url).pathname.startsWith('/api/'))return new Response(null,{status:allowed?204:403,headers:allowed?{'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Methods':'POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type','Vary':'Origin'}:{}});const response=await handleInternal(request,env,assets);if(allowed){const headers=new Headers(response.headers);headers.set('Access-Control-Allow-Origin',origin);headers.set('Vary','Origin');return new Response(response.body,{status:response.status,headers});}return response;}
+async function handleInternal(request,env,assets){
  const url=new URL(request.url);
  if(!['/api/walking-route','/api/walking-candidates'].includes(url.pathname)){
   if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405});
@@ -8,7 +9,7 @@ export async function handleRequest(request,env,assets){
   return new Response(request.method==='HEAD'?null:asset.body,{headers:{'Content-Type':asset.type,'Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'}});
  }
  if(request.method!=='POST')return json({error:'POST 요청이 필요합니다.'},405);
- if(request.headers.get('Origin')&&request.headers.get('Origin')!==url.origin)return json({error:'다른 사이트에서는 호출할 수 없습니다.'},403);
+ if(request.headers.get('Origin')&&request.headers.get('Origin')!==url.origin&&request.headers.get('Origin')!=='https://lightemittingdiode.github.io')return json({error:'다른 사이트에서는 호출할 수 없습니다.'},403);
  if(!env.KAKAO_REST_API_KEY)return json({error:'카카오 도보 경로 연결 설정이 필요합니다.'},503);
  let input;try{const raw=await request.text();if(raw.length>2048)throw Error();input=JSON.parse(raw)}catch{return json({error:'출발·도착 좌표를 확인해주세요.'},400)}
  const valid=p=>p&&Number.isFinite(p.lat)&&Number.isFinite(p.lng)&&Math.hypot((p.lat-CENTER.lat)*111195,(p.lng-CENTER.lng)*111195*Math.cos(CENTER.lat*Math.PI/180))<=1001;
